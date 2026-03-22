@@ -9,6 +9,7 @@ export const PROVIDER_TYPES = [
   'minimax-portal',
   'minimax-portal-cn',
   'qwen-portal',
+  'github-copilot',
   'ollama',
   'custom',
 ] as const;
@@ -24,6 +25,7 @@ export const BUILTIN_PROVIDER_TYPES = [
   'minimax-portal',
   'minimax-portal-cn',
   'qwen-portal',
+  'github-copilot',
   'ollama',
 ] as const;
 

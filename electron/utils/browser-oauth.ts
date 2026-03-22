@@ -3,11 +3,17 @@ import { BrowserWindow, shell } from 'electron';
 import { logger } from './logger';
 import { loginGeminiCliOAuth, type GeminiCliOAuthCredentials } from './gemini-cli-oauth';
 import { loginOpenAICodexOAuth, type OpenAICodexOAuthCredentials } from './openai-codex-oauth';
+import {
+  loginGitHubCopilotOAuth,
+  type GitHubCopilotOAuthCredentials,
+  COPILOT_RUNTIME_PROVIDER_ID,
+  COPILOT_DEFAULT_MODEL,
+} from './github-copilot-oauth';
 import { getProviderService } from '../services/providers/provider-service';
 import { getSecretStore } from '../services/secrets/secret-store';
 import { saveOAuthTokenToOpenClaw } from './openclaw-auth';
 
-export type BrowserOAuthProviderType = 'google' | 'openai';
+export type BrowserOAuthProviderType = 'google' | 'openai' | 'github-copilot';
 
 const GOOGLE_RUNTIME_PROVIDER_ID = 'google-gemini-cli';
 const GOOGLE_OAUTH_DEFAULT_MODEL = 'gemini-3-pro-preview';
@@ -47,6 +53,12 @@ class BrowserOAuthManager extends EventEmitter {
       return true;
     }
 
+    if (provider === 'github-copilot') {
+      // GitHub Device Flow is non-blocking (polls in background).
+      void this.executeFlow(provider);
+      return true;
+    }
+
     await this.executeFlow(provider);
     return true;
   }
@@ -75,7 +87,26 @@ class BrowserOAuthManager extends EventEmitter {
             },
           },
         })
-        : await loginOpenAICodexOAuth({
+        : provider === 'github-copilot'
+          ? await loginGitHubCopilotOAuth({
+            onDeviceCode: (data) => {
+              const payload = {
+                provider,
+                mode: 'device' as const,
+                userCode: data.userCode,
+                verificationUri: data.verificationUri,
+              };
+              this.emit('oauth:code', payload);
+              if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('oauth:code', payload);
+              }
+            },
+            onOpenUrl: async (url) => {
+              await shell.openExternal(url);
+            },
+            isCancelled: () => !this.active,
+          })
+          : await loginOpenAICodexOAuth({
           openUrl: async (url) => {
             await shell.openExternal(url);
           },
@@ -145,7 +176,7 @@ class BrowserOAuthManager extends EventEmitter {
 
   private async onSuccess(
     providerType: BrowserOAuthProviderType,
-    token: GeminiCliOAuthCredentials | OpenAICodexOAuthCredentials,
+    token: GeminiCliOAuthCredentials | OpenAICodexOAuthCredentials | GitHubCopilotOAuthCredentials,
   ) {
     const accountId = this.activeAccountId || providerType;
     const accountLabel = this.activeLabel;
@@ -160,17 +191,38 @@ class BrowserOAuthManager extends EventEmitter {
     const providerService = getProviderService();
     const existing = await providerService.getAccount(accountId);
     const isGoogle = providerType === 'google';
-    const runtimeProviderId = isGoogle ? GOOGLE_RUNTIME_PROVIDER_ID : OPENAI_RUNTIME_PROVIDER_ID;
-    const defaultModel = isGoogle ? GOOGLE_OAUTH_DEFAULT_MODEL : OPENAI_OAUTH_DEFAULT_MODEL;
-    const accountLabelDefault = isGoogle ? 'Google Gemini' : 'OpenAI Codex';
+    const isCopilot = providerType === 'github-copilot';
+    const runtimeProviderId = isCopilot
+      ? COPILOT_RUNTIME_PROVIDER_ID
+      : isGoogle ? GOOGLE_RUNTIME_PROVIDER_ID : OPENAI_RUNTIME_PROVIDER_ID;
+    const defaultModel = isCopilot
+      ? COPILOT_DEFAULT_MODEL
+      : isGoogle ? GOOGLE_OAUTH_DEFAULT_MODEL : OPENAI_OAUTH_DEFAULT_MODEL;
+    const accountLabelDefault = isCopilot
+      ? 'GitHub Copilot'
+      : isGoogle ? 'Google Gemini' : 'OpenAI Codex';
     const oauthTokenEmail = 'email' in token && typeof token.email === 'string' ? token.email : undefined;
-    const oauthTokenSubject = 'projectId' in token && typeof token.projectId === 'string'
-      ? token.projectId
-      : ('accountId' in token && typeof token.accountId === 'string' ? token.accountId : undefined);
+    const oauthTokenUsername = 'username' in token && typeof token.username === 'string' ? token.username : undefined;
+    const oauthTokenSubject = isCopilot
+      ? (oauthTokenUsername ?? oauthTokenEmail)
+      : ('projectId' in token && typeof token.projectId === 'string'
+        ? token.projectId
+        : ('accountId' in token && typeof token.accountId === 'string' ? token.accountId : undefined));
+    const copilotModels = 'models' in token && Array.isArray(token.models) ? token.models : undefined;
+    const copilotModelIds = copilotModels?.map((m: unknown) => {
+      if (typeof m === 'string') return m;
+      if (typeof m === 'object' && m !== null && 'id' in m && typeof (m as { id: unknown }).id === 'string') {
+        return (m as { id: string }).id;
+      }
+      return String(m);
+    });
 
     const normalizedExistingModel = (() => {
       const value = existing?.model?.trim();
       if (!value) return undefined;
+      if (isCopilot) {
+        return value;
+      }
       if (isGoogle) {
         return value.includes('/') ? value.split('/').pop() : value;
       }
@@ -194,8 +246,9 @@ class BrowserOAuthManager extends EventEmitter {
       isDefault: existing?.isDefault ?? false,
       metadata: {
         ...existing?.metadata,
-        email: oauthTokenEmail,
+        email: oauthTokenEmail || oauthTokenUsername,
         resourceUrl: runtimeProviderId,
+        ...(copilotModelIds ? { customModels: copilotModelIds } : {}),
       },
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
