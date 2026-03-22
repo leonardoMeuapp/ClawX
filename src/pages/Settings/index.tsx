@@ -75,8 +75,6 @@ export function Settings() {
     setAutoDownloadUpdate,
     devModeUnlocked,
     setDevModeUnlocked,
-    telemetryEnabled,
-    setTelemetryEnabled,
   } = useSettingsStore();
 
   const { status: gatewayStatus, restart: restartGateway } = useGatewayStore();
@@ -614,19 +612,6 @@ export function Settings() {
                 <Switch
                   checked={devModeUnlocked}
                   onCheckedChange={setDevModeUnlocked}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-[15px] font-medium text-foreground">{t('advanced.telemetry')}</Label>
-                  <p className="text-[13px] text-muted-foreground mt-1">
-                    {t('advanced.telemetryDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={telemetryEnabled}
-                  onCheckedChange={setTelemetryEnabled}
                 />
               </div>
 

@@ -27,9 +27,6 @@ export interface AppSettings {
   language: string;
   startMinimized: boolean;
   launchAtStartup: boolean;
-  telemetryEnabled: boolean;
-  machineId: string;
-  hasReportedInstall: boolean;
 
   // Gateway
   gatewayAutoStart: boolean;
@@ -78,9 +75,6 @@ function createDefaultSettings(): AppSettings {
     language: resolveSupportedLanguage(getSystemLocale()),
     startMinimized: false,
     launchAtStartup: false,
-    telemetryEnabled: true,
-    machineId: '',
-    hasReportedInstall: false,
 
     // Gateway
     gatewayAutoStart: true,
@@ -149,6 +143,14 @@ export async function setSetting<K extends keyof AppSettings>(
 export async function getAllSettings(): Promise<AppSettings> {
   const store = await getSettingsStore();
   return store.store;
+}
+
+/**
+ * Delete a legacy setting key that no longer exists in the AppSettings schema.
+ */
+export async function deleteLegacySetting(key: string): Promise<void> {
+  const store = await getSettingsStore();
+  store.delete(key);
 }
 
 /**

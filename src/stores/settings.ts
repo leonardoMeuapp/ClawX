@@ -17,7 +17,6 @@ interface SettingsState {
   language: string;
   startMinimized: boolean;
   launchAtStartup: boolean;
-  telemetryEnabled: boolean;
 
   // Gateway
   gatewayAutoStart: boolean;
@@ -47,7 +46,6 @@ interface SettingsState {
   setLanguage: (language: string) => void;
   setStartMinimized: (value: boolean) => void;
   setLaunchAtStartup: (value: boolean) => void;
-  setTelemetryEnabled: (value: boolean) => void;
   setGatewayAutoStart: (value: boolean) => void;
   setGatewayPort: (port: number) => void;
   setProxyEnabled: (value: boolean) => void;
@@ -70,7 +68,6 @@ const defaultSettings = {
   language: resolveSupportedLanguage(typeof navigator !== 'undefined' ? navigator.language : undefined),
   startMinimized: false,
   launchAtStartup: false,
-  telemetryEnabled: true,
   gatewayAutoStart: true,
   gatewayPort: 18789,
   proxyEnabled: false,
@@ -128,13 +125,6 @@ export const useSettingsStore = create<SettingsState>()(
         void hostApiFetch('/api/settings/launchAtStartup', {
           method: 'PUT',
           body: JSON.stringify({ value: launchAtStartup }),
-        }).catch(() => { });
-      },
-      setTelemetryEnabled: (telemetryEnabled) => {
-        set({ telemetryEnabled });
-        void hostApiFetch('/api/settings/telemetryEnabled', {
-          method: 'PUT',
-          body: JSON.stringify({ value: telemetryEnabled }),
         }).catch(() => { });
       },
       setGatewayAutoStart: (gatewayAutoStart) => {

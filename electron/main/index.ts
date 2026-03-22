@@ -13,7 +13,7 @@ import { createMenu } from './menu';
 import { appUpdater, registerUpdateHandlers } from './updater';
 import { logger } from '../utils/logger';
 import { warmupNetworkOptimization } from '../utils/uv-env';
-import { initTelemetry } from '../utils/telemetry';
+import { deleteLegacySetting } from '../utils/store';
 
 import { ClawHubService } from '../gateway/clawhub';
 import { ensureClawXContext, repairClawXOnlyBootstrapFiles } from '../utils/openclaw-workspace';
@@ -257,8 +257,10 @@ async function initialize(): Promise<void> {
   // Warm up network optimization (non-blocking)
   void warmupNetworkOptimization();
 
-  // Initialize Telemetry early
-  await initTelemetry();
+  // Clean up legacy telemetry artifacts from previous versions (idempotent).
+  for (const key of ['telemetryEnabled', 'machineId', 'hasReportedInstall']) {
+    void deleteLegacySetting(key).catch(() => {});
+  }
 
   // Apply persisted proxy settings before creating windows or network requests.
   await applyProxySettings();

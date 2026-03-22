@@ -1,92 +1,58 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import { describe, expect, it, vi } from 'vitest';
 
-const {
-  shutdownMock,
-  captureMock,
-  getSettingMock,
-  setSettingMock,
-  loggerDebugMock,
-  loggerErrorMock,
-} = vi.hoisted(() => ({
-  shutdownMock: vi.fn(),
-  captureMock: vi.fn(),
-  getSettingMock: vi.fn(),
-  setSettingMock: vi.fn(),
-  loggerDebugMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-}));
-
-vi.mock('posthog-node', () => ({
-  PostHog: vi.fn(function PostHogMock() {
-    return {
-      capture: captureMock,
-      shutdown: shutdownMock,
-    };
-  }),
-}));
-
-vi.mock('@electron/utils/store', () => ({
-  getSetting: getSettingMock,
-  setSetting: setSettingMock,
-}));
+const loggerInfoMock = vi.fn();
 
 vi.mock('@electron/utils/logger', () => ({
   logger: {
-    debug: loggerDebugMock,
-    error: loggerErrorMock,
-    info: vi.fn(),
+    info: loggerInfoMock,
+    debug: vi.fn(),
+    error: vi.fn(),
     warn: vi.fn(),
   },
 }));
 
-vi.mock('electron', () => ({
-  app: {
-    getVersion: () => '0.2.1',
-  },
-}));
+describe('main telemetry module', () => {
+  it('exports trackMetric and logs locally', async () => {
+    const mod = await import('@electron/utils/telemetry');
+    expect(typeof mod.trackMetric).toBe('function');
 
-vi.mock('node-machine-id', () => ({
-  machineIdSync: () => 'machine-id-1',
-}));
-
-describe('main telemetry shutdown', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
-    getSettingMock.mockImplementation(async (key: string) => {
-      switch (key) {
-        case 'telemetryEnabled':
-          return true;
-        case 'machineId':
-          return 'existing-machine-id';
-        case 'hasReportedInstall':
-          return true;
-        default:
-          return undefined;
-      }
-    });
-    setSettingMock.mockResolvedValue(undefined);
-    captureMock.mockReturnValue(undefined);
+    mod.trackMetric('test.event', { key: 'value' });
+    expect(loggerInfoMock).toHaveBeenCalledWith('[metric] test.event', { key: 'value' });
   });
 
-  it('ignores PostHog network timeout errors during shutdown', async () => {
-    shutdownMock.mockRejectedValueOnce(
-      Object.assign(new Error('Network error while fetching PostHog'), {
-        name: 'PostHogFetchNetworkError',
-        cause: Object.assign(new Error('The operation was aborted due to timeout'), {
-          name: 'TimeoutError',
-        }),
-      }),
-    );
+  it('does not export remote telemetry functions', async () => {
+    const mod = await import('@electron/utils/telemetry');
+    expect('initTelemetry' in mod).toBe(false);
+    expect('captureTelemetryEvent' in mod).toBe(false);
+    expect('shutdownTelemetry' in mod).toBe(false);
+  });
+});
 
-    const { initTelemetry, shutdownTelemetry } = await import('@electron/utils/telemetry');
-    await initTelemetry();
-    await shutdownTelemetry();
+describe('analytics dependencies removed from package.json', () => {
+  const pkgPath = path.resolve(__dirname, '../../package.json');
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 
-    expect(loggerErrorMock).not.toHaveBeenCalled();
-    expect(loggerDebugMock).toHaveBeenCalledWith(
-      'Ignored telemetry shutdown network error:',
-      expect.objectContaining({ name: 'PostHogFetchNetworkError' }),
+  it('does not include posthog-node', () => {
+    expect(pkg.dependencies?.['posthog-node']).toBeUndefined();
+    expect(pkg.devDependencies?.['posthog-node']).toBeUndefined();
+  });
+
+  it('does not include node-machine-id', () => {
+    expect(pkg.dependencies?.['node-machine-id']).toBeUndefined();
+    expect(pkg.devDependencies?.['node-machine-id']).toBeUndefined();
+  });
+});
+
+describe('no device fingerprinting in telemetry module', () => {
+  it('telemetry source does not reference machineId or node-machine-id', () => {
+    const telemetrySource = fs.readFileSync(
+      path.resolve(__dirname, '../../electron/utils/telemetry.ts'),
+      'utf-8',
     );
+    expect(telemetrySource).not.toContain('machineId');
+    expect(telemetrySource).not.toContain('node-machine-id');
+    expect(telemetrySource).not.toContain('machineIdSync');
   });
 });
