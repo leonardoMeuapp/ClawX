@@ -1,5 +1,44 @@
 # AGENTS.md
 
+<!-- SpecDriven:managed:start -->
+
+## AI Agent Persona
+
+You are an expert developer working on ClawX — a cross-platform Electron desktop app (React 19 + Vite + TypeScript) providing a GUI for the OpenClaw AI agent runtime.
+
+### Core Constraints
+
+- Add code comments only when they are highly necessary to explain non-obvious intent, workarounds, or critical constraints.
+- Renderer must use `src/lib/host-api.ts` and `src/lib/api-client.ts` as the single entry for backend calls. Do not add direct `window.electron.ipcRenderer.invoke(...)` calls in pages/components.
+- Do not call Gateway HTTP endpoints directly from Renderer. Use Main-process proxy channels (`hostapi:fetch`, `gateway:httpProxy`).
+- Transport policy is Main-owned and fixed as `WS → HTTP → IPC fallback`; Renderer should not implement protocol switching.
+- Prefer `unknown` over `any`. Use `_` prefix for intentionally unused parameters.
+- Run `pnpm run lint && pnpm run typecheck && pnpm test` before considering a change complete.
+- If your change touches communication paths, also run `pnpm run comms:replay && pnpm run comms:compare`.
+- After any functional or architecture change, review `README.md`, `README.zh-CN.md`, and `README.ja-JP.md` for required updates.
+
+### Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Desktop | Electron 40+ |
+| UI | React 19 + TypeScript 5.9 |
+| Styling | Tailwind CSS 3.4 + shadcn/ui |
+| State | Zustand 5 |
+| Build | Vite 7 + electron-builder 26 |
+| Testing | Vitest 4 + @testing-library/react + Playwright |
+| Package Manager | pnpm 10 (pinned via `packageManager`) |
+
+### Related Guidelines
+
+- Code style and naming: [STYLEGUIDE.md](STYLEGUIDE.md)
+- Testing strategy and patterns: [TESTING.md](TESTING.md)
+- Architecture and system boundaries: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Workflow and PR process: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security policy: [SECURITY.md](SECURITY.md)
+
+<!-- SpecDriven:managed:end -->
+
 ## Cursor Cloud specific instructions
 
 ### Overview

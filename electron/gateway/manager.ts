@@ -9,7 +9,7 @@ import WebSocket from 'ws';
 import { PORTS } from '../utils/config';
 import { JsonRpcNotification, isNotification, isResponse } from './protocol';
 import { logger } from '../utils/logger';
-import { captureTelemetryEvent, trackMetric } from '../utils/telemetry';
+import { trackMetric } from '../utils/telemetry';
 import {
   loadOrCreateDeviceIdentity,
   type DeviceIdentity,
@@ -413,7 +413,6 @@ export class GatewayManager extends EventEmitter {
         gateway_restart_circuit_open_until: observability.circuit_open_until,
       };
       trackMetric('gateway.restart.suppressed', props);
-      captureTelemetryEvent('gateway_restart_suppressed', props);
       return;
     }
 
@@ -434,7 +433,6 @@ export class GatewayManager extends EventEmitter {
         gateway_restart_circuit_open_until: observability.circuit_open_until,
       };
       trackMetric('gateway.restart.executed', props);
-      captureTelemetryEvent('gateway_restart_executed', props);
       logger.info(
         `[gateway-refresh] mode=restart result=applied pidBefore=${pidBefore ?? 'n/a'} pidAfter=${this.status.pid ?? 'n/a'} ` +
         `suppressed=${observability.suppressed_total} executed=${observability.executed_total} circuitOpenUntil=${observability.circuit_open_until}`,
@@ -978,7 +976,6 @@ export class GatewayManager extends EventEmitter {
     };
 
     trackMetric('gateway.reconnect', properties);
-    captureTelemetryEvent('gateway_reconnect', properties);
   }
 
   /**
