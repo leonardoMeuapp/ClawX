@@ -8,6 +8,7 @@ import siliconflow from './siliconflow.svg';
 import minimaxPortal from './minimax.svg';
 import qwenPortal from './qwen.svg';
 import cursor from './cursor.svg';
+import githubCopilot from './github-copilot.svg';
 import ollama from './ollama.svg';
 import custom from './custom.svg';
 
@@ -23,6 +24,7 @@ export const providerIcons: Record<string, string> = {
     'minimax-portal-cn': minimaxPortal,
     'qwen-portal': qwenPortal,
     cursor,
+    'github-copilot': githubCopilot,
     ollama,
     custom,
 };
