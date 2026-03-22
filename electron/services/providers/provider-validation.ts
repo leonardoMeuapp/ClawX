@@ -7,6 +7,7 @@ type ValidationProfile =
   | 'google-query-key'
   | 'anthropic-header'
   | 'openrouter'
+  | 'cursor-basic-auth'
   | 'none';
 
 type ValidationResult = { valid: boolean; error?: string; status?: number };
@@ -89,6 +90,9 @@ function getValidationProfile(
   providerType: string,
   options?: { apiProtocol?: string }
 ): ValidationProfile {
+  if (providerType === 'cursor') {
+    return 'cursor-basic-auth';
+  }
   const providerApi = options?.apiProtocol || getProviderConfig(providerType)?.api;
   if (providerApi === 'anthropic-messages') {
     return 'anthropic-header';
@@ -339,6 +343,34 @@ async function validateOpenRouterKey(
   return await performProviderValidationRequest(providerType, url, headers);
 }
 
+async function validateCursorKey(
+  providerType: string,
+  apiKey: string,
+): Promise<ValidationResult> {
+  const url = 'https://api.cursor.com/v0/me';
+  const headers = {
+    Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`,
+  };
+  try {
+    logValidationRequest(providerType, 'GET', url, headers);
+    const response = await proxyAwareFetch(url, { headers });
+    logValidationStatus(providerType, response.status);
+    if (response.status >= 200 && response.status < 300) {
+      const data = await response.json().catch(() => ({})) as { userEmail?: string };
+      return { valid: true, status: response.status, ...(data.userEmail ? { email: data.userEmail } : {}) } as ValidationResult;
+    }
+    if (response.status === 401 || response.status === 403) {
+      return { valid: false, error: 'Invalid or expired Cursor API key', status: response.status };
+    }
+    return { valid: false, error: `Cursor API error: ${response.status}`, status: response.status };
+  } catch (error) {
+    return {
+      valid: false,
+      error: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
 export async function validateApiKeyWithProvider(
   providerType: string,
   apiKey: string,
@@ -378,6 +410,8 @@ export async function validateApiKeyWithProvider(
         return await validateAnthropicHeaderKey(providerType, trimmedKey, resolvedBaseUrl);
       case 'openrouter':
         return await validateOpenRouterKey(providerType, trimmedKey);
+      case 'cursor-basic-auth':
+        return await validateCursorKey(providerType, trimmedKey);
       default:
         return { valid: false, error: `Unsupported validation profile for provider: ${providerType}` };
     }

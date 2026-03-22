@@ -482,6 +482,7 @@ interface RuntimeProviderConfigOverride {
   apiKeyEnv?: string;
   headers?: Record<string, string>;
   authHeader?: boolean;
+  modelIds?: string[];
 }
 
 type ProviderEntryBuildOptions = {
@@ -617,12 +618,17 @@ export async function syncProviderConfigToOpenClaw(
     ensureMoonshotKimiWebSearchCnBaseUrl(config, provider);
 
     if (override.baseUrl && override.api) {
+      const allModelIds = [
+        ...(modelId ? [modelId] : []),
+        ...(override.modelIds ?? []),
+      ];
       upsertOpenClawProviderEntry(config, provider, {
         baseUrl: override.baseUrl,
         api: override.api,
         apiKeyEnv: override.apiKeyEnv,
         headers: override.headers,
-        modelIds: modelId ? [modelId] : [],
+        modelIds: allModelIds.length > 0 ? allModelIds : [],
+        mergeExistingModels: true,
       });
     }
 
