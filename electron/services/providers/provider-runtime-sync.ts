@@ -14,6 +14,7 @@ import {
   updateAgentModelProvider,
 } from '../../utils/openclaw-auth';
 import { logger } from '../../utils/logger';
+import { fetchCursorModels, getCursorModelIds } from './cursor-models';
 
 const GOOGLE_OAUTH_RUNTIME_PROVIDER = 'google-gemini-cli';
 const GOOGLE_OAUTH_DEFAULT_MODEL_REF = `${GOOGLE_OAUTH_RUNTIME_PROVIDER}/gemini-3-pro-preview`;
@@ -321,6 +322,38 @@ async function syncCustomProviderAgentModel(
   });
 }
 
+async function syncCursorModelsToRuntime(
+  config: ProviderConfig,
+  context: RuntimeProviderSyncContext,
+): Promise<void> {
+  if (config.type !== 'cursor') {
+    return;
+  }
+
+  try {
+    const secret = await getProviderSecret(config.id);
+    if (!secret) {
+      return;
+    }
+
+    const models = await fetchCursorModels(secret, config.id);
+    const modelIds = getCursorModelIds(models);
+    if (modelIds.length > 0) {
+      await syncProviderConfigToOpenClaw(context.runtimeProviderKey, config.model, {
+        baseUrl: normalizeProviderBaseUrl(config, config.baseUrl || context.meta?.baseUrl, context.api),
+        api: context.api,
+        apiKeyEnv: context.meta?.apiKeyEnv,
+        headers: context.meta?.headers,
+        modelIds,
+      });
+    }
+  } catch (error) {
+    logger.warn(
+      `[cursor-models] Failed to sync models: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 async function syncProviderToRuntime(
   config: ProviderConfig,
   apiKey: string | undefined,
@@ -333,6 +366,7 @@ async function syncProviderToRuntime(
   await syncProviderSecretToRuntime(config, context.runtimeProviderKey, apiKey);
   await syncRuntimeProviderConfig(config, context);
   await syncCustomProviderAgentModel(config, context.runtimeProviderKey, apiKey);
+  await syncCursorModelsToRuntime(config, context);
   return context;
 }
 
