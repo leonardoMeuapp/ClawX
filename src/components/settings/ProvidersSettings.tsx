@@ -48,6 +48,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { CopilotModelSelector } from './CopilotModelSelector';
 import { invokeIpc } from '@/lib/api-client';
 import { useSettingsStore } from '@/stores/settings';
 import { hostApiFetch } from '@/lib/host-api';
@@ -521,6 +522,18 @@ function ProviderCard({
           </div>
         )}
       </div>
+
+      {account.vendorId === 'github-copilot' && account.metadata?.customModels && account.metadata.customModels.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/5">
+          <CopilotModelSelector
+            models={account.metadata.customModels}
+            activeModel={account.model ?? ''}
+            onSelectModel={async (selectedModel) => {
+              await onSaveEdits({ updates: { model: selectedModel } });
+            }}
+          />
+        </div>
+      )}
 
       {isEditing && (
         <div className="space-y-6 mt-4 pt-4 border-t border-black/5 dark:border-white/5">
